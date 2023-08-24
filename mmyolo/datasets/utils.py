@@ -131,3 +131,32 @@ class BatchShapePolicy:
             data_info['batch_shape'] = batch_shapes[batch_index[i]]
 
         return data_list
+
+@COLLATE_FUNCTIONS.register_module()
+def synimage_collate(data_batch: Sequence,
+                     use_ms_training: bool = False) -> dict:
+    """Rewrite collate_fn to get faster training speed.
+
+        Args:
+           data_batch (Sequence): Batch of data.
+           use_ms_training (bool): Whether to use multi-scale training.
+        """
+    batch_imgs = []
+    batch_targets = []
+    batch_names = []
+    for i in range(len(data_batch)):
+        inputs = data_batch[i]['inputs']
+        targets = data_batch[i]['targets']
+        names = data_batch[i]['metainfo']['file_name']
+        batch_imgs.append(inputs)
+        batch_targets.append(targets)
+        batch_names.append(names)
+    
+    collated_results = dict(img_names=batch_names)
+    if use_ms_training:
+        collated_results['inputs'] = batch_imgs
+        collated_results['targets'] = batch_targets
+    else:
+        collated_results['inputs'] = torch.stack(batch_imgs, 0)
+        collated_results['targets'] = torch.stack(batch_targets, 0)
+    return collated_results

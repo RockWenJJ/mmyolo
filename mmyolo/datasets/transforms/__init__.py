@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from .formatting import PackDetInputs
+from .formatting import PackDetInputs, PackEnInputs
 from .mix_img_transforms import Mosaic, Mosaic9, YOLOv5MixUp, YOLOXMixUp
 from .transforms import (FilterAnnotations, LetterResize, LoadAnnotations,
                          Polygon2Mask, PPYOLOERandomCrop, PPYOLOERandomDistort,
@@ -7,6 +7,7 @@ from .transforms import (FilterAnnotations, LetterResize, LoadAnnotations,
                          RemoveDataElement, Resize, YOLOv5CopyPaste,
                          YOLOv5HSVRandomAug, YOLOv5KeepRatioResize,
                          YOLOv5RandomAffine)
+from .syn_transforms import LoadSynImagesFromFile, ResizeSynImage, RandomFlipSynImage
 
 __all__ = [
     'YOLOv5KeepRatioResize', 'LetterResize', 'Mosaic', 'YOLOXMixUp',
@@ -14,5 +15,6 @@ __all__ = [
     'YOLOv5RandomAffine', 'PPYOLOERandomDistort', 'PPYOLOERandomCrop',
     'Mosaic9', 'YOLOv5CopyPaste', 'RemoveDataElement', 'RegularizeRotatedBox',
     'Polygon2Mask', 'PackDetInputs', 'RandomAffine', 'RandomFlip', 'Resize',
-    'FilterAnnotations'
+    'FilterAnnotations', 'LoadSynImagesFromFile', 'ResizeSynImage', 'RandomFlipSynImage',
+    'PackEnInputs'
 ]
