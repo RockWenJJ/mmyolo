@@ -9,7 +9,7 @@ from mmdet.models import BatchSyncRandomResize
 from mmdet.models.data_preprocessors import DetDataPreprocessor
 from mmengine import MessageHub, is_list_of, is_seq_of
 from mmengine.structures import BaseDataElement
-from mmengine.model import ImgDataPreprocessor
+from mmengine.model import ImgDataPreprocessor, stack_batch
 from torch import Tensor
 
 from mmyolo.registry import MODELS
@@ -335,7 +335,6 @@ class EnDataPreprocessor(ImgDataPreprocessor):
         """
         data = self.cast_data(data)  # type: ignore
         _batch_inputs = data['inputs']
-        _batch_targets = data['targets']
         # Process data with `pseudo_collate`.
         if is_seq_of(_batch_inputs, torch.Tensor):
             batch_inputs = []
@@ -385,8 +384,13 @@ class EnDataPreprocessor(ImgDataPreprocessor):
             raise TypeError('Output of `cast_data` should be a dict of '
                             'list/tuple with inputs and data_samples, '
                             f'but got {type(data)}： {data}')
-        ####
+        if not training:
+            data['inputs'] = batch_inputs
+            data.setdefault('data_samples', None)
+            return data
+
         #### Process target data with `pseudo_collate`.
+        _batch_targets = data['targets']
         if is_seq_of(_batch_targets, torch.Tensor):
             batch_targets = []
             for _batch_target in _batch_targets:

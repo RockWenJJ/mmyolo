@@ -137,6 +137,6 @@ default_hooks = dict(
 
 
 train_cfg = dict(
-    type='EpochBasedTrainLoopWith2Loaders',
+    type='EpochBasedTrainLoop4EnYOLO',
     max_epochs=max_epochs,
     val_interval=save_checkpoint_intervals)

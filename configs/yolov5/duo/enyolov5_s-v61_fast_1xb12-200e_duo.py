@@ -15,8 +15,10 @@ anchors = [
 ]
 
 max_epochs = 200
-train_batch_size_per_gpu = 16
-train_num_workers = 8
+burnin_epoch = 0
+
+train_batch_size_per_gpu = 4
+train_num_workers = 0
 # save_checkpoint_intervals = 10
 # val_intervals = 1
 
@@ -132,12 +134,6 @@ model = dict(
         act_cfg=dict(type='SiLU', inplace=True)),
     test_cfg=model_test_cfg)
 
-# model = dict(
-#     backbone=dict(frozen_stages=4),
-#     bbox_head=dict(
-#         head_module=dict(num_classes=num_classes),
-#         prior_generator=dict(base_sizes=anchors)),
-# )
 
 persistent_workers = False
 train_dataloader = dict(
@@ -164,7 +160,7 @@ pre_transform = [
     # dict(type='LoadAnnotations', with_bbox=True)
 ]
 
-train_pipeline1 = [
+train_pipeline_enh = [
     *pre_transform,
     dict(
         type='ResizeSynImage',
@@ -175,11 +171,9 @@ train_pipeline1 = [
     dict(type='PackEnInputs')
 ]
 
-
-# train_dataloader1 = train_dataloader
 syn_dataset_type = 'SynDataset'
 syn_data_root = './data/synthesis'
-train_dataloader1 = dict(
+train_dataloader_enh = dict(
     batch_size=train_batch_size_per_gpu,
     num_workers=train_num_workers,
     persistent_workers=persistent_workers,
@@ -187,7 +181,7 @@ train_dataloader1 = dict(
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
         type=syn_dataset_type,
-        pipeline=train_pipeline1,
+        pipeline=train_pipeline_enh,
         ann_file='train_infos.json',
         data_root=syn_data_root,
         data_prefix=dict(input='synthesis/', target='images/'),
@@ -219,8 +213,8 @@ default_hooks = dict(
 # train_cfg = dict(max_epochs=max_epochs, val_interval=10)
 # visualizer = dict(vis_backends = [dict(type='LocalVisBackend'), dict(type='WandbVisBackend')]) # noqa
 
-
 train_cfg = dict(
-    type='EpochBasedTrainLoopWith2Loaders',
+    type='EpochBasedTrainLoop4EnYOLO',
     max_epochs=max_epochs,
+    burnin_epoch= burnin_epoch,
     val_interval=val_intervals)

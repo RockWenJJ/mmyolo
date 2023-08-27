@@ -79,7 +79,7 @@ class EnYOLODetector(SingleStageDetector):
     
     def run_enhancement(self,
                         inputs: torch.Tensor,
-                        targets: torch.Tensor,
+                        targets: torch.Tensor = None,
                         img_names: Optional[list] = None,
                         data_samples: Optional[list] = None,
                         mode: str = 'loss') -> Union[Dict[str, torch.Tensor], list]:

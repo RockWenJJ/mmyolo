@@ -11,7 +11,7 @@ from mmengine.runner import Runner
 
 from mmyolo.registry import RUNNERS
 from mmyolo.utils import is_metainfo_lower
-from mmyolo.engine import RunnerWith2Loaders
+from mmyolo.engine import Runner4EnYOLO
 
 
 def parse_args():
@@ -111,7 +111,7 @@ def main():
     if 'runner_type' not in cfg:
         # build the default runner
         # runner = Runner.from_cfg(cfg)
-        runner = RunnerWith2Loaders.from_cfg(cfg)
+        runner = Runner4EnYOLO.from_cfg(cfg)
     else:
         # build customized runner from the registry
         # if 'runner_type' is set in the cfg

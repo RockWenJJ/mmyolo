@@ -10,13 +10,14 @@ from torch.utils.data import DataLoader
 
 from mmengine.registry import RUNNERS, LOOPS
 from mmengine.runner import Runner as BaseRunner
-from mmengine.runner import BaseLoop
+from mmengine.runner import BaseLoop, EpochBasedTrainLoop, IterBasedTrainLoop
 
 @RUNNERS.register_module()
-class RunnerWith2Loaders(BaseRunner):
+class Runner4EnYOLO(BaseRunner):
     def __init__(self, *args, **kwargs):
-        train_dataloader1 = kwargs.pop('train_dataloader1')
-        self._train_dataloader1 = train_dataloader1
+        train_dataloader_enh = kwargs.pop('train_dataloader_enh')
+        # self.burnin_epoch = kwargs.pop('burnin_epoch')
+        self._train_dataloader_enh = train_dataloader_enh
         super().__init__(*args, **kwargs)
         
         
@@ -27,7 +28,7 @@ class RunnerWith2Loaders(BaseRunner):
             model=cfg['model'],
             work_dir=cfg['work_dir'],
             train_dataloader=cfg.get('train_dataloader'),
-            train_dataloader1=cfg.get('train_dataloader1'),
+            train_dataloader_enh=cfg.get('train_dataloader_enh'),
             val_dataloader=cfg.get('val_dataloader'),
             test_dataloader=cfg.get('test_dataloader'),
             train_cfg=cfg.get('train_cfg'),
@@ -69,12 +70,12 @@ class RunnerWith2Loaders(BaseRunner):
                 'Only one of `type` or `by_epoch` can exist in `loop_cfg`.')
     
         if 'type' in loop_cfg:
-            if loop_cfg['type'] == 'EpochBasedTrainLoopWith2Loaders':
+            if loop_cfg['type'] == 'EpochBasedTrainLoop4EnYOLO':
                 loop = LOOPS.build(
                     loop_cfg,
                     default_args=dict(
                         runner=self, dataloader=self._train_dataloader,
-                        dataloader1=self._train_dataloader1))
+                        dataloader_enh=self._train_dataloader_enh))
             else:
                 loop = LOOPS.build(
                     loop_cfg,

@@ -13,7 +13,7 @@ anchors = [
 
 max_epochs = 40
 train_batch_size_per_gpu = 12
-train_num_workers = 4
+train_num_workers = 0
 
 load_from = 'https://download.openmmlab.com/mmyolo/v0/yolov5/yolov5_s-v61_syncbn_fast_8xb16-300e_coco/yolov5_s-v61_syncbn_fast_8xb16-300e_coco_20220918_084700-86e02187.pth'  # noqa
 
@@ -26,6 +26,7 @@ model = dict(
 train_dataloader = dict(
     batch_size=train_batch_size_per_gpu,
     num_workers=train_num_workers,
+    persistent_workers=False,
     dataset=dict(
         data_root=data_root,
         metainfo=metainfo,
