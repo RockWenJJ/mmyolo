@@ -1,28 +1,69 @@
-_base_ = '../yolov5_s-v61_syncbn_fast_8xb16-300e_coco.py'
+_base_ = './yolov5_s-v61_syncbn-fast_8xb16-300e_duo.py'
 
-img_scale = (640, 640)
-dataset_type = 'YOLOv5CocoDataset'
-data_root = './data/duo/'
+# ========================Frequently modified parameters======================
+# -----data related-----
+data_root = './data/duo/'  # Root path of data
+# Path of train annotation file
+train_ann_file = 'annotations/instances_train.json'
+train_data_prefix = 'images/train/'  # Prefix of train image path
+# Path of val annotation file
+val_ann_file = 'annotations/instances_test.json'
+val_data_prefix = 'images/test/'  # Prefix of val image path
+
 class_name = ('holothurian', 'echinus', 'scallop', 'starfish')
-num_classes = len(class_name)
+num_classes = len(class_name)  # Number of classes for classification
 metainfo = dict(classes=class_name,
                 palette=[(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230)])
+# Batch size of a single GPU during training
+train_batch_size_per_gpu = 4
+# Worker to pre-fetch data for each single GPU during training
+train_num_workers = 0
+# persistent_workers must be False if num_workers is 0
+persistent_workers = False
 
+# -----model related-----
+# Basic size of multi-scale prior box
 anchors = [
-    [(68, 69), (154, 91), (143, 162)],  # P3/8
-    [(242, 160), (189, 287), (391, 207)],  # P4/16
-    [(353, 337), (539, 341), (443, 432)]  # P5/32
+    [(10, 13), (16, 30), (33, 23)],  # P3/8
+    [(30, 61), (62, 45), (59, 119)],  # P4/16
+    [(116, 90), (156, 198), (373, 326)]  # P5/32
 ]
 
-max_epochs = 400
+# -----train val related-----
+# Base learning rate for optim_wrapper. Corresponding to 8xb16=128 bs
+base_lr = 0.01
+max_epochs = 400  # Maximum training epochs
 burnin_epoch = 300
 
-train_batch_size_per_gpu = 4
-train_num_workers = 0
-# save_checkpoint_intervals = 10
-# val_intervals = 1
+model_test_cfg = dict(
+    # The config of multi-label for multi-class prediction.
+    multi_label=True,
+    # The number of boxes before NMS
+    nms_pre=30000,
+    score_thr=0.001,  # Threshold to filter out boxes.
+    nms=dict(type='nms', iou_threshold=0.65),  # NMS type and threshold
+    max_per_img=300)  # Max number of detections of each image
 
-load_from = 'https://download.openmmlab.com/mmyolo/v0/yolov5/yolov5_s-v61_syncbn_fast_8xb16-300e_coco/yolov5_s-v61_syncbn_fast_8xb16-300e_coco_20220918_084700-86e02187.pth'  # noqa
+# ========================Possible modified parameters========================
+# -----data related-----
+img_scale = (640, 640)  # width, height
+# Dataset type, this will be used to define the dataset
+dataset_type = 'YOLOv5CocoDataset'
+# Batch size of a single GPU during validation
+val_batch_size_per_gpu = 1
+# Worker to pre-fetch data for each single GPU during validation
+val_num_workers = 2
+
+# Config of batch shapes. Only on val.
+# It means not used if batch_shapes_cfg is None.
+batch_shapes_cfg = dict(
+    type='BatchShapePolicy',
+    batch_size=val_batch_size_per_gpu,
+    img_size=img_scale[0],
+    # The image scale of padding should be divided by pad_size_divisor
+    size_divisor=32,
+    # Additional paddings for pixel scale
+    extra_pad_ratio=0.5)
 
 # -----model related-----
 # The scaling factor that controls the depth of the network structure
@@ -46,28 +87,20 @@ lr_factor = 0.01  # Learning rate scaling factor
 weight_decay = 0.0005
 # Save model checkpoint and validation intervals
 save_checkpoint_intervals = 10
-val_intervals = 1
+val_intervals = 2
 # The maximum checkpoints to keep.
 max_keep_ckpts = 3
 # Single-scale training is recommended to
 # be turned on, which can speed up training.
 env_cfg = dict(cudnn_benchmark=True)
 
-model_test_cfg = dict(
-    # The config of multi-label for multi-class prediction.
-    multi_label=True,
-    # The number of boxes before NMS
-    nms_pre=30000,
-    score_thr=0.001,  # Threshold to filter out boxes.
-    nms=dict(type='nms', iou_threshold=0.65),  # NMS type and threshold
-    max_per_img=300)  # Max number of detections of each image
-
-
+# ===============================Unmodified in most cases====================
 model = dict(
     _delete_=True,
     type='EnYOLODetector',
     data_preprocessor=dict(
-        type='YOLOv5DetDataPreprocessor',
+        # type='YOLOv5DetDataPreprocessor',
+        type='mmdet.DetDataPreprocessor',
         mean=[0., 0., 0.],
         std=[255., 255., 255.],
         bgr_to_rgb=True),
@@ -134,8 +167,6 @@ model = dict(
         act_cfg=dict(type='SiLU', inplace=True)),
     test_cfg=model_test_cfg)
 
-
-persistent_workers = False
 train_dataloader = dict(
     batch_size=train_batch_size_per_gpu,
     num_workers=train_num_workers,
@@ -143,8 +174,8 @@ train_dataloader = dict(
     dataset=dict(
         data_root=data_root,
         metainfo=metainfo,
-        ann_file='annotations/instances_train.json',
-        data_prefix=dict(img='images/train/')))
+        ann_file=train_ann_file,
+        data_prefix=dict(img=train_data_prefix)))
 
 
 # enhancement train loader
@@ -194,10 +225,8 @@ val_dataloader = dict(
     dataset=dict(
         metainfo=metainfo,
         data_root=data_root,
-        ann_file='annotations/instances_test.json',
-        data_prefix=dict(img='images/test/')))
-
-test_dataloader = val_dataloader
+        ann_file=val_ann_file,
+        data_prefix=dict(img=val_data_prefix)))
 
 _base_.optim_wrapper.optimizer.batch_size_per_gpu = train_batch_size_per_gpu
 
@@ -210,8 +239,6 @@ default_hooks = dict(
     # The default value is 1000 which is not suitable for cat datasets.
     param_scheduler=dict(max_epochs=max_epochs, warmup_mim_iter=10),
     logger=dict(type='LoggerHook', interval=5))
-# train_cfg = dict(max_epochs=max_epochs, val_interval=10)
-# visualizer = dict(vis_backends = [dict(type='LocalVisBackend'), dict(type='WandbVisBackend')]) # noqa
 
 train_cfg = dict(
     type='EpochBasedTrainLoop4EnYOLO',
