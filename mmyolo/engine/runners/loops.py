@@ -4,6 +4,7 @@ import time
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from mmengine.registry import LOOPS
@@ -105,15 +106,26 @@ class EpochBasedTrainLoop4EnYOLO(EpochBasedTrainLoop):
                 data_det['inputs'] = torch.clip(data_det_enh, 0., 1.)
 
                 losses_tmp = self.runner.model._run_forward(data_det, mode='loss')
-                feats_enh = self.runner.model.extract_feat(data_det['inputs'])
-
-                # compute adversarial loss
                 losses_det = {}
                 # renew keys
                 for k, v in losses_tmp.items():
-                    losses_det[k+'1'] = v
-
+                    losses_det[k + '1'] = v
                 losses.update(losses_det)
+                
+                feats_enh = self.runner.model.extract_feat(data_det['inputs'])
+                
+                losses_const = []
+                for feat_ori, feat_enh in zip(feats_ori, feats_enh):
+                    losses_const.append(nn.L1Loss()(feat_ori, feat_enh))
+                
+                loss_const = dict(loss_const=sum(losses_const))
+                
+                losses.update(loss_const)
+
+                # compute adversarial loss
+                
+
+                
 
                 parsed_losses, log_vars = self.runner.model.parse_losses(losses)  # type: ignore
                 self.runner.optim_wrapper.update_params(parsed_losses)

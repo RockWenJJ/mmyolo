@@ -14,8 +14,8 @@ anchors = [
     [(353, 337), (539, 341), (443, 432)]  # P5/32
 ]
 
-max_epochs = 200
-burnin_epoch = 0
+max_epochs = 400
+burnin_epoch = 300
 
 train_batch_size_per_gpu = 4
 train_num_workers = 0
@@ -111,7 +111,7 @@ model = dict(
             use_sigmoid=True,
             reduction='mean',
             loss_weight=loss_cls_weight *
-            (num_classes / 80 * 3 / num_det_layers)),
+            (num_classes / num_classes * 3 / num_det_layers)),
         loss_bbox=dict(
             type='IoULoss',
             iou_mode='ciou',
