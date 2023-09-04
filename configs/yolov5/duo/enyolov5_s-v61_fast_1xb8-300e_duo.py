@@ -15,9 +15,9 @@ num_classes = len(class_name)  # Number of classes for classification
 metainfo = dict(classes=class_name,
                 palette=[(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230)])
 # Batch size of a single GPU during training
-train_batch_size_per_gpu = 4
+train_batch_size_per_gpu = 8
 # Worker to pre-fetch data for each single GPU during training
-train_num_workers = 0
+train_num_workers = 8
 # persistent_workers must be False if num_workers is 0
 persistent_workers = False
 
@@ -95,6 +95,8 @@ max_keep_ckpts = 3
 env_cfg = dict(cudnn_benchmark=True)
 
 # ===============================Unmodified in most cases====================
+load_from = 'https://download.openmmlab.com/mmyolo/v0/yolov5/yolov5_s-v61_syncbn_fast_8xb16-300e_coco/yolov5_s-v61_syncbn_fast_8xb16-300e_coco_20220918_084700-86e02187.pth'  # noqa
+
 model = dict(
     _delete_=True,
     type='EnYOLODetector',

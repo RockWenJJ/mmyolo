@@ -91,7 +91,7 @@ class EnYOLODetector(SingleStageDetector):
         
         if mode == 'loss':
             loss_l1 = nn.L1Loss()(pred, targets)
-            return {'loss_l1':loss_l1}
+            return {'loss_l1': 10 * loss_l1}
         elif mode == 'tensor':
             return pred
         else:
