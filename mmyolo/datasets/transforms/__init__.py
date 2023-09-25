@@ -8,6 +8,7 @@ from .transforms import (FilterAnnotations, LetterResize, LoadAnnotations,
                          YOLOv5HSVRandomAug, YOLOv5KeepRatioResize,
                          YOLOv5RandomAffine)
 from .syn_transforms import LoadSynImagesFromFile, ResizeSynImage, RandomFlipSynImage
+from .rw_transforms import LoadRwImagesFromFile
 
 __all__ = [
     'YOLOv5KeepRatioResize', 'LetterResize', 'Mosaic', 'YOLOXMixUp',
@@ -16,5 +17,5 @@ __all__ = [
     'Mosaic9', 'YOLOv5CopyPaste', 'RemoveDataElement', 'RegularizeRotatedBox',
     'Polygon2Mask', 'PackDetInputs', 'RandomAffine', 'RandomFlip', 'Resize',
     'FilterAnnotations', 'LoadSynImagesFromFile', 'ResizeSynImage', 'RandomFlipSynImage',
-    'PackEnInputs'
+    'PackEnInputs', 'LoadRwImagesFromFile'
 ]

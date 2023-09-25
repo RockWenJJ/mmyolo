@@ -15,7 +15,8 @@ num_classes = len(class_name)  # Number of classes for classification
 metainfo = dict(classes=class_name,
                 palette=[(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230)])
 # Batch size of a single GPU during training
-train_batch_size_per_gpu = 8
+train_batch_size_per_gpu = 16
+train_batch_size_per_gpu_ml = 6
 # Worker to pre-fetch data for each single GPU during training
 train_num_workers = 8
 # persistent_workers must be False if num_workers is 0
@@ -31,9 +32,9 @@ anchors = [
 
 # -----train val related-----
 # Base learning rate for optim_wrapper. Corresponding to 8xb16=128 bs
-base_lr = 0.01
-max_epochs = 400  # Maximum training epochs
-burnin_epoch = 0
+base_lr = 0.01 #0.01
+max_epochs = 300  # Maximum training epochs
+burnin_epoch = 300
 
 model_test_cfg = dict(
     # The config of multi-label for multi-class prediction.
@@ -67,9 +68,9 @@ batch_shapes_cfg = dict(
 
 # -----model related-----
 # The scaling factor that controls the depth of the network structure
-deepen_factor = 0.33
+deepen_factor = 0.67
 # The scaling factor that controls the width of the network structure
-widen_factor = 0.5
+widen_factor = 0.75
 # Strides of multi-scale prior box
 strides = [8, 16, 32]
 num_det_layers = 3  # The number of model output scales
@@ -95,7 +96,7 @@ max_keep_ckpts = 3
 env_cfg = dict(cudnn_benchmark=True)
 
 # ===============================Unmodified in most cases====================
-load_from = 'https://download.openmmlab.com/mmyolo/v0/yolov5/yolov5_s-v61_syncbn_fast_8xb16-300e_coco/yolov5_s-v61_syncbn_fast_8xb16-300e_coco_20220918_084700-86e02187.pth'  # noqa
+load_from = 'https://download.openmmlab.com/mmyolo/v0/yolov5/yolov5_m-v61_syncbn_fast_8xb16-300e_coco/yolov5_m-v61_syncbn_fast_8xb16-300e_coco_20220917_204944-516a710f.pth'   # noqa
 
 model = dict(
     _delete_=True,
@@ -165,8 +166,10 @@ model = dict(
         obj_level_weights=obj_level_weights),
     en_head=dict(
         type='BaseEnHead',
+        deepen_factor=deepen_factor,
+        widen_factor=widen_factor,
         norm_cfg=norm_cfg,
-        act_cfg=dict(type='SiLU', inplace=True)),
+        act_cfg=dict(type='ReLU', inplace=True)),
     test_cfg=model_test_cfg)
 
 train_dataloader = dict(
@@ -189,16 +192,15 @@ pre_transform_enh = [
 ]
 train_pipeline_enh = [
     *pre_transform_enh,
-    dict(
-        type='ResizeSynImage',
-        scale=img_scale),
+    dict(type='ResizeSynImage',
+        scale=img_scale, keep_ratio=True),
     dict(
         type='RandomFlipSynImage',
         prob=0.5),
     dict(type='PackEnInputs')
 ]
 train_dataloader_enh = dict(
-    batch_size=train_batch_size_per_gpu // 2,
+    batch_size=train_batch_size_per_gpu_ml,
     num_workers=train_num_workers,
     persistent_workers=persistent_workers,
     pin_memory=True,
@@ -220,7 +222,12 @@ pre_transform_det = [
 ]
 train_pipeline_det = [
     *pre_transform_det, # no mosaic_affine_pipeline and random colorazation
-    dict(type='mmdet.Resize', scale=img_scale),
+    dict(type='YOLOv5KeepRatioResize', scale=img_scale),
+    dict(type='LetterResize',
+        scale=img_scale,
+        allow_scale_up=False,
+        pad_val=dict(img=114)),
+    dict(type='PPYOLOERandomCrop', aspect_ratio=[0.5, 1.0], thresholds=[0.2]),
     dict(type='mmdet.RandomFlip', prob=0.5),
     dict(
         type='mmdet.PackDetInputs',
@@ -229,7 +236,7 @@ train_pipeline_det = [
 ]
 
 train_dataloader_det = dict(
-    batch_size=train_batch_size_per_gpu // 2,
+    batch_size=train_batch_size_per_gpu_ml,
     num_workers=train_num_workers,
     persistent_workers=persistent_workers,
     pin_memory=True,
@@ -257,15 +264,46 @@ _base_.optim_wrapper.optimizer.batch_size_per_gpu = train_batch_size_per_gpu
 val_evaluator = dict(ann_file=data_root + 'annotations/instances_test.json')
 test_evaluator = val_evaluator
 
+# =============================== Dataloader for enhancement validation ==============================
+val_enh_dataset_type= 'RwDataset'
+val_enh_data_root = './data/real-world'
+val_pipeline_enh = [
+    dict(type='LoadRwImagesFromFile', backend_args=_base_.backend_args),
+    dict(type='YOLOv5KeepRatioResize', scale=(512, 512)),
+    dict(type='PackEnInputs', meta_keys=('file_name', 'img_shape', 'ori_shape',
+                            'scale_factor'))
+]
+
+val_dataloader_enh = dict(
+    batch_size=1,
+    num_workers=8,
+    persistent_workers=persistent_workers,
+    pin_memory=True,
+    drop_last=False,
+    sampler=dict(type='DefaultSampler', shuffle=False),
+    dataset=dict(
+        type=val_enh_dataset_type,
+        pipeline=val_pipeline_enh,
+        data_root=val_enh_data_root,
+        img_suffix='.png'),
+    collate_fn=dict(type='rwimage_collate')
+)
+
+val_enh_cfg = dict(type='EnhanceLoop')
+
 default_hooks = dict(
     checkpoint=dict(interval=10, max_keep_ckpts=2, save_best='auto'),
     # The warmup_mim_iter parameter is critical.
     # The default value is 1000 which is not suitable for cat datasets.
     param_scheduler=dict(max_epochs=max_epochs, warmup_mim_iter=10),
-    logger=dict(type='LoggerHook', interval=5))
+    logger=dict(type='LoggerHook', interval=50))
 
 train_cfg = dict(
     type='EpochBasedTrainLoop4EnYOLO',
     max_epochs=max_epochs,
     burnin_epoch= burnin_epoch,
     val_interval=val_intervals)
+
+optim_wrapper = dict(
+    type='OptimWrapper',
+    optimizer=dict(lr=base_lr))

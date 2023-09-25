@@ -59,8 +59,7 @@ class LoadSynImagesFromFile(LoadImageFromFile):
         results['file_name'] = img_name
         
         return results
-            
-        # filename = results[]
+        
 
 @TRANSFORMS.register_module()
 class ResizeSynImage(Resize):
@@ -94,6 +93,7 @@ class ResizeSynImage(Resize):
         results = super().transform(results)
         self._resize_target(results)
         return results
+    
 
 @TRANSFORMS.register_module()
 class RandomFlipSynImage(RandomFlip):

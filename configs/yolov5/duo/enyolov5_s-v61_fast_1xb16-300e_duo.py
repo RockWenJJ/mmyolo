@@ -15,7 +15,8 @@ num_classes = len(class_name)  # Number of classes for classification
 metainfo = dict(classes=class_name,
                 palette=[(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230)])
 # Batch size of a single GPU during training
-train_batch_size_per_gpu = 8
+train_batch_size_per_gpu = 16
+train_batch_size_per_gpu_ml = 6
 # Worker to pre-fetch data for each single GPU during training
 train_num_workers = 8
 # persistent_workers must be False if num_workers is 0
@@ -31,9 +32,9 @@ anchors = [
 
 # -----train val related-----
 # Base learning rate for optim_wrapper. Corresponding to 8xb16=128 bs
-base_lr = 0.01
+base_lr = 0.0005 #0.01
 max_epochs = 400  # Maximum training epochs
-burnin_epoch = 0
+burnin_epoch = 296
 
 model_test_cfg = dict(
     # The config of multi-label for multi-class prediction.
@@ -189,16 +190,15 @@ pre_transform_enh = [
 ]
 train_pipeline_enh = [
     *pre_transform_enh,
-    dict(
-        type='ResizeSynImage',
-        scale=img_scale),
+    dict(type='ResizeSynImage',
+        scale=img_scale, keep_ratio=True),
     dict(
         type='RandomFlipSynImage',
         prob=0.5),
     dict(type='PackEnInputs')
 ]
 train_dataloader_enh = dict(
-    batch_size=train_batch_size_per_gpu // 2,
+    batch_size=train_batch_size_per_gpu_ml,
     num_workers=train_num_workers,
     persistent_workers=persistent_workers,
     pin_memory=True,
@@ -220,7 +220,11 @@ pre_transform_det = [
 ]
 train_pipeline_det = [
     *pre_transform_det, # no mosaic_affine_pipeline and random colorazation
-    dict(type='mmdet.Resize', scale=img_scale),
+    dict(type='YOLOv5KeepRatioResize', scale=img_scale),
+    dict(type='LetterResize',
+        scale=img_scale,
+        allow_scale_up=False,
+        pad_val=dict(img=114)),
     dict(type='mmdet.RandomFlip', prob=0.5),
     dict(
         type='mmdet.PackDetInputs',
@@ -229,7 +233,7 @@ train_pipeline_det = [
 ]
 
 train_dataloader_det = dict(
-    batch_size=train_batch_size_per_gpu // 2,
+    batch_size=train_batch_size_per_gpu_ml,
     num_workers=train_num_workers,
     persistent_workers=persistent_workers,
     pin_memory=True,
@@ -262,10 +266,14 @@ default_hooks = dict(
     # The warmup_mim_iter parameter is critical.
     # The default value is 1000 which is not suitable for cat datasets.
     param_scheduler=dict(max_epochs=max_epochs, warmup_mim_iter=10),
-    logger=dict(type='LoggerHook', interval=5))
+    logger=dict(type='LoggerHook', interval=50))
 
 train_cfg = dict(
     type='EpochBasedTrainLoop4EnYOLO',
     max_epochs=max_epochs,
     burnin_epoch= burnin_epoch,
     val_interval=val_intervals)
+
+optim_wrapper = dict(
+    type='OptimWrapper',
+    optimizer=dict(lr=base_lr))

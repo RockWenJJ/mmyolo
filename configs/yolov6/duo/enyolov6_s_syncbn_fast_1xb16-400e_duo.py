@@ -16,6 +16,7 @@ metainfo = dict(classes=class_name,
                 palette=[(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230)])
 # Batch size of a single GPU during training
 train_batch_size_per_gpu = 16
+train_batch_size_per_gpu_ml = 6
 # Worker to pre-fetch data for each single GPU during training
 train_num_workers = 8
 # persistent_workers must be False if num_workers is 0
@@ -24,8 +25,9 @@ persistent_workers = False
 # -----train val related-----
 # Base learning rate for optim_wrapper
 base_lr = 0.01
-max_epochs = 300  # Maximum training epochs
+max_epochs = 400  # Maximum training epochs
 num_last_epochs = 15  # Last epoch number to switch training pipeline
+burnin_epoch = 200
 
 # ======================= Possible modified parameters =======================
 # -----data related-----
@@ -69,9 +71,15 @@ env_cfg = dict(cudnn_benchmark=True)
 load_from = 'https://download.openmmlab.com/mmyolo/v0/yolov6/yolov6_s_syncbn_fast_8xb32-400e_coco/yolov6_s_syncbn_fast_8xb32-400e_coco_20221102_203035-932e1d91.pth'  # noqa
 
 model = dict(
-    type='YOLODetector',
+    type='EnYOLODetector',
     data_preprocessor=dict(
         type='YOLOv5DetDataPreprocessor',
+        # type='mmdet.DetDataPreprocessor',
+        mean=[0., 0., 0.],
+        std=[255., 255., 255.],
+        bgr_to_rgb=True),
+    en_data_preprocessor=dict(
+        type='EnDataPreprocessor',
         mean=[0., 0., 0.],
         std=[255., 255., 255.],
         bgr_to_rgb=True),
@@ -79,6 +87,7 @@ model = dict(
         type='YOLOv6EfficientRep',
         deepen_factor=deepen_factor,
         widen_factor=widen_factor,
+        out_indices=(0, 1, 2, 3, 4),
         norm_cfg=dict(type='BN', momentum=0.03, eps=0.001),
         act_cfg=dict(type='ReLU', inplace=True)),
     neck=dict(
@@ -108,6 +117,10 @@ model = dict(
             reduction='mean',
             loss_weight=2.5,
             return_iou=False)),
+    en_head=dict(
+        type='BaseEnHead',
+        norm_cfg=dict(type='BN', momentum=0.03, eps=0.001),
+        act_cfg=dict(type='ReLU', inplace=True)),
     train_cfg=dict(
         initial_epoch=4,
         initial_assigner=dict(
@@ -233,6 +246,101 @@ val_dataloader = dict(
 
 test_dataloader = val_dataloader
 
+# =============================== Dataloader for enhancement ====================
+syn_dataset_type = 'SynDataset'
+syn_data_root = './data/synthesis'
+pre_transform_enh = [
+    dict(type='LoadSynImagesFromFile', backend_args=_base_.backend_args),
+    # dict(type='LoadAnnotations', with_bbox=True)
+]
+train_pipeline_enh = [
+    *pre_transform_enh,
+    dict(type='ResizeSynImage',
+        scale=img_scale, keep_ratio=True),
+    dict(
+        type='RandomFlipSynImage',
+        prob=0.5),
+    dict(type='PackEnInputs')
+]
+train_dataloader_enh = dict(
+    batch_size=train_batch_size_per_gpu_ml,
+    num_workers=train_num_workers,
+    persistent_workers=persistent_workers,
+    pin_memory=True,
+    sampler=dict(type='DefaultSampler', shuffle=True),
+    dataset=dict(
+        type=syn_dataset_type,
+        pipeline=train_pipeline_enh,
+        ann_file='train_infos.json',
+        data_root=syn_data_root,
+        data_prefix=dict(input='synthesis/', target='images/'),
+        img_suffix='.png',
+        test_mode=False),
+    collate_fn=dict(type='synimage_collate'))
+
+# =============================== Dataloader for detection in mutual-learning stage ====================
+pre_transform_det = [
+    dict(type='LoadImageFromFile', backend_args=_base_.backend_args),
+    dict(type='LoadAnnotations', with_bbox=True)
+]
+train_pipeline_det = [
+    *pre_transform_det, # no mosaic_affine_pipeline and random colorazation
+    dict(type='YOLOv5KeepRatioResize', scale=img_scale),
+    dict(type='LetterResize',
+        scale=img_scale,
+        allow_scale_up=False,
+        pad_val=dict(img=114)),
+    dict(type='PPYOLOERandomCrop', aspect_ratio=[0.5, 1.0], thresholds=[0.2]),
+    dict(type='mmdet.RandomFlip', prob=0.5),
+    dict(
+        type='mmdet.PackDetInputs',
+        meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'flip',
+                   'flip_direction'))
+]
+
+train_dataloader_det = dict(
+    batch_size=train_batch_size_per_gpu_ml,
+    num_workers=train_num_workers,
+    persistent_workers=persistent_workers,
+    pin_memory=True,
+    sampler=dict(type='DefaultSampler', shuffle=True),
+    dataset=dict(
+        type=dataset_type,
+        data_root=data_root,
+        metainfo=metainfo,
+        ann_file=train_ann_file,
+        data_prefix=dict(img=train_data_prefix),
+        filter_cfg=dict(filter_empty_gt=False, min_size=32),
+        pipeline=train_pipeline_det)
+)
+
+# =============================== Dataloader for enhancement validation ==============================
+val_enh_dataset_type= 'RwDataset'
+val_enh_data_root = './data/real-world'
+val_pipeline_enh = [
+    dict(type='LoadRwImagesFromFile', backend_args=_base_.backend_args),
+    dict(type='YOLOv5KeepRatioResize', scale=(512, 512)),
+    dict(type='PackEnInputs', meta_keys=('file_name', 'img_shape', 'ori_shape',
+                            'scale_factor'))
+]
+
+val_dataloader_enh = dict(
+    batch_size=1,
+    num_workers=8,
+    persistent_workers=persistent_workers,
+    pin_memory=True,
+    drop_last=False,
+    sampler=dict(type='DefaultSampler', shuffle=False),
+    dataset=dict(
+        type=val_enh_dataset_type,
+        pipeline=val_pipeline_enh,
+        data_root=val_enh_data_root,
+        img_suffix='.png'),
+    collate_fn=dict(type='rwimage_collate')
+)
+
+val_enh_cfg = dict(type='EnhanceLoop')
+
 # Optimizer and learning rate scheduler of YOLOv6 are basically the same as YOLOv5. # noqa
 # The difference is that the scheduler_type of YOLOv6 is cosine.
 optim_wrapper = dict(
@@ -280,8 +388,9 @@ val_evaluator = dict(
 test_evaluator = val_evaluator
 
 train_cfg = dict(
-    type='EpochBasedTrainLoop',
+    type='EpochBasedTrainLoop4EnYOLO',
     max_epochs=max_epochs,
+    burnin_epoch= burnin_epoch,
     val_interval=val_intervals,
     dynamic_intervals=[(max_epochs - num_last_epochs, 1)])
 val_cfg = dict(type='ValLoop')

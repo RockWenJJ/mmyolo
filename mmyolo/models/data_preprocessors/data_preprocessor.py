@@ -388,59 +388,61 @@ class EnDataPreprocessor(ImgDataPreprocessor):
             data['inputs'] = batch_inputs
             data.setdefault('data_samples', None)
             return data
-
-        #### Process target data with `pseudo_collate`.
-        _batch_targets = data['targets']
-        if is_seq_of(_batch_targets, torch.Tensor):
-            batch_targets = []
-            for _batch_target in _batch_targets:
-                # channel transform
-                if self._channel_conversion:
-                    _batch_target = _batch_target[[2, 1, 0], ...]
-                # Convert to float after channel conversion to ensure
-                # efficiency
-                _batch_target = _batch_target.float()
-                # Normalization.
-                if self._enable_normalize:
-                    if self.mean.shape[0] == 3:
-                        assert _batch_target.dim(
-                        ) == 3 and _batch_target.shape[0] == 3, (
-                            'If the mean has 3 values, the target tensor '
-                            'should in shape of (3, H, W), but got the tensor '
-                            f'with shape {_batch_target.shape}')
-                    _batch_target = (_batch_target - self.mean) / self.std
-                batch_targets.append(_batch_target)
-            # Pad and stack Tensor.
-            batch_targets = stack_batch(batch_targets, self.pad_size_divisor,
-                                       self.pad_value)
-        # Process data with `default_collate`.
-        elif isinstance(_batch_targets, torch.Tensor):
-            assert _batch_targets.dim() == 4, (
-                'The input of `ImgDataPreprocessor` should be a NCHW tensor '
-                'or a list of tensor, but got a tensor with shape: '
-                f'{_batch_targets.shape}')
-            if self._channel_conversion:
-                _batch_targets = _batch_targets[:, [2, 1, 0], ...]
-            # Convert to float after channel conversion to ensure
-            # efficiency
-            _batch_targets = _batch_targets.float()
-            if self._enable_normalize:
-                _batch_targets = (_batch_targets - self.mean) / self.std
-            h, w = _batch_targets.shape[2:]
-            target_h = math.ceil(
-                h / self.pad_size_divisor) * self.pad_size_divisor
-            target_w = math.ceil(
-                w / self.pad_size_divisor) * self.pad_size_divisor
-            pad_h = target_h - h
-            pad_w = target_w - w
-            batch_targets = F.pad(_batch_targets, (0, pad_w, 0, pad_h),
-                                 'constant', self.pad_value)
-        else:
-            raise TypeError('Output of `cast_data` should be a dict of '
-                            'list/tuple with inputs and data_samples, '
-                            f'but got {type(data)}： {data}')
         
         data['inputs'] = batch_inputs
-        data['targets'] = batch_targets
+
+        #### Process target data with `pseudo_collate`.
+        if 'targets' in data.keys():
+            _batch_targets = data['targets']
+            if is_seq_of(_batch_targets, torch.Tensor):
+                batch_targets = []
+                for _batch_target in _batch_targets:
+                    # channel transform
+                    if self._channel_conversion:
+                        _batch_target = _batch_target[[2, 1, 0], ...]
+                    # Convert to float after channel conversion to ensure
+                    # efficiency
+                    _batch_target = _batch_target.float()
+                    # Normalization.
+                    if self._enable_normalize:
+                        if self.mean.shape[0] == 3:
+                            assert _batch_target.dim(
+                            ) == 3 and _batch_target.shape[0] == 3, (
+                                'If the mean has 3 values, the target tensor '
+                                'should in shape of (3, H, W), but got the tensor '
+                                f'with shape {_batch_target.shape}')
+                        _batch_target = (_batch_target - self.mean) / self.std
+                    batch_targets.append(_batch_target)
+                # Pad and stack Tensor.
+                batch_targets = stack_batch(batch_targets, self.pad_size_divisor,
+                                            self.pad_value)
+            # Process data with `default_collate`.
+            elif isinstance(_batch_targets, torch.Tensor):
+                assert _batch_targets.dim() == 4, (
+                    'The input of `ImgDataPreprocessor` should be a NCHW tensor '
+                    'or a list of tensor, but got a tensor with shape: '
+                    f'{_batch_targets.shape}')
+                if self._channel_conversion:
+                    _batch_targets = _batch_targets[:, [2, 1, 0], ...]
+                # Convert to float after channel conversion to ensure
+                # efficiency
+                _batch_targets = _batch_targets.float()
+                if self._enable_normalize:
+                    _batch_targets = (_batch_targets - self.mean) / self.std
+                h, w = _batch_targets.shape[2:]
+                target_h = math.ceil(
+                    h / self.pad_size_divisor) * self.pad_size_divisor
+                target_w = math.ceil(
+                    w / self.pad_size_divisor) * self.pad_size_divisor
+                pad_h = target_h - h
+                pad_w = target_w - w
+                batch_targets = F.pad(_batch_targets, (0, pad_w, 0, pad_h),
+                                      'constant', self.pad_value)
+            else:
+                raise TypeError('Output of `cast_data` should be a dict of '
+                                'list/tuple with inputs and data_samples, '
+                                f'but got {type(data)}： {data}')
+            data['targets'] = batch_targets
+        
         data.setdefault('data_samples', None)
         return data
